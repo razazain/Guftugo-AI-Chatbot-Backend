@@ -1,0 +1,208 @@
+openapi: 3.1.0
+info:
+  title: Guftugo API
+  version: 1.0.0
+  description: Guftugo AI assistant backend API. See API.md for examples and SSE details.
+servers:
+  - url: http://localhost:5000/api/v1
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      security: []
+      summary: Health status
+      responses:
+        '200': { description: Server status and MongoDB connection state }
+  /health/ready:
+    get:
+      security: []
+      summary: Readiness status
+      responses:
+        '200': { description: Ready }
+        '503': { description: Database not ready }
+  /auth/register:
+    post:
+      security: []
+      summary: Register a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 80 }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8, maxLength: 128 }
+                preferredLanguage: { type: string, enum: [auto, english, roman-urdu] }
+      responses:
+        '201': { description: Registered; returns user and tokens }
+        '400': { description: Validation error }
+  /auth/login:
+    post:
+      security: []
+      summary: Sign in
+      responses:
+        '200': { description: Authenticated; returns user and tokens }
+  /auth/refresh:
+    post:
+      security: []
+      summary: Rotate a refresh token
+      responses:
+        '200': { description: New token pair }
+  /auth/logout:
+    post:
+      summary: Revoke refresh token
+      responses:
+        '200': { description: Signed out }
+  /auth/me:
+    get:
+      summary: Get current user
+      responses:
+        '200': { description: User profile }
+    patch:
+      summary: Update current user profile
+      responses:
+        '200': { description: Updated profile }
+  /auth/me/language:
+    patch:
+      summary: Set preferred language
+      responses:
+        '200': { description: Updated language preference }
+  /chat:
+    post:
+      summary: Send a chat message (non-streaming)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string, minLength: 1, maxLength: 15000 }
+                conversationId: { type: string }
+                language: { type: string, enum: [auto, english, roman-urdu] }
+                documentIds:
+                  type: array
+                  maxItems: 5
+                  items: { type: string, minLength: 24, maxLength: 24 }
+                webSearch: { type: boolean, default: false }
+      responses:
+        '200': { description: User and assistant messages plus conversation metadata }
+        '503': { description: All configured LLM providers failed }
+  /chat/stream:
+    post:
+      summary: Stream a chat response via Server-Sent Events
+      description: SSE events are documented in API.md.
+      responses:
+        '200': { description: text/event-stream }
+  /conversations:
+    get:
+      summary: List current user's conversations
+      responses:
+        '200': { description: Paginated conversations }
+    post:
+      summary: Create an empty conversation
+      responses:
+        '201': { description: Conversation created }
+  /conversations/{id}/messages:
+    get:
+      summary: Read messages for a conversation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
+        - in: query
+          name: before
+          schema: { type: string }
+      responses:
+        '200': { description: Chronological message page }
+  /conversations/{id}:
+    patch:
+      summary: Rename a conversation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Conversation renamed }
+    delete:
+      summary: Delete a conversation and its messages
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Conversation deleted }
+  /documents:
+    get:
+      summary: List current user's uploaded documents
+      responses:
+        '200': { description: Paginated user-owned documents }
+    post:
+      summary: Upload a UTF-8 text, Markdown, CSV, JSON, or text-based PDF document
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201': { description: Document stored }
+        '413': { description: File too large }
+  /documents/{id}:
+    get:
+      summary: Read uploaded document metadata and optional extracted text
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: includeContent
+          schema: { type: boolean, default: false }
+      responses:
+        '200': { description: Document metadata }
+    delete:
+      summary: Delete uploaded document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Document deleted }
+  /usage/summary:
+    get:
+      summary: Read current user's usage summary
+      parameters:
+        - in: query
+          name: days
+          schema: { type: integer, minimum: 1, maximum: 90, default: 7 }
+      responses:
+        '200': { description: Request, token, and latency totals }
+  /usage/providers:
+    get:
+      summary: Read public provider configuration details
+      responses:
+        '200': { description: Provider names and model configuration without API keys }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+# Document upload notes: accepts UTF-8 TXT/MD/CSV/JSON and text-based PDF (max 5 MB, max 100 PDF pages).

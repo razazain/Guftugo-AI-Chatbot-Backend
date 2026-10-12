@@ -1,0 +1,11 @@
+process.env.NODE_ENV = 'test';
+process.env.PORT = '5001';
+process.env.API_PREFIX = '/api/v1';
+process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/guftugo_test';
+process.env.JWT_ACCESS_SECRET = 'test-access-secret-with-at-least-32-characters';
+process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-with-at-least-32-characters';
+process.env.LLM_PROVIDER = 'groq';
+process.env.GROQ_API_KEY = 'test-groq-key';
+process.env.LLM_FALLBACK_PROVIDERS = 'gemini,openai';
+process.env.GEMINI_API_KEY = 'test-gemini-key';
+process.env.OPENAI_API_KEY = 'test-openai-key';
