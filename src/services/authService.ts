@@ -106,7 +106,7 @@ export async function loginWithGoogleFirebase(
     } else {
       try {
         const displayName = identity.name?.trim().slice(0, 80);
-        const emailName = normalizedEmail.split('@')[0].slice(0, 80);
+        const emailName = normalizedEmail.split('@')[0]?.slice(0, 80) ?? '';
         const safeName = displayName && displayName.length >= 2
           ? displayName
           : emailName.length >= 2 ? emailName : 'Google User';
