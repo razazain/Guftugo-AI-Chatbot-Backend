@@ -46,6 +46,33 @@ paths:
       summary: Sign in
       responses:
         '200': { description: Authenticated; returns user and tokens }
+  /auth/google:
+    post:
+      security: []
+      tags: [Authentication]
+      summary: Sign in with Google through Firebase Authentication
+      description: Verifies a Firebase ID token issued from the Google sign-in provider and returns the normal Guftugo API session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [idToken]
+              properties:
+                idToken:
+                  type: string
+                  minLength: 100
+                preferredLanguage:
+                  type: string
+                  enum: [auto, english, roman-urdu]
+      responses:
+        '200':
+          description: Google sign-in succeeded; includes user, accessToken, and refreshToken.
+        '401':
+          description: The Firebase token is invalid or does not represent a verified Google sign-in.
+        '503':
+          description: Firebase Admin credentials are not configured on the server.
   /auth/refresh:
     post:
       security: []

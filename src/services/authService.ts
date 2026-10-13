@@ -6,6 +6,7 @@ import { env } from '../config/env';
 import { UserModel } from '../models/User';
 import { RefreshTokenModel } from '../models/RefreshToken';
 import { AppError } from '../utils/AppError';
+import { verifyGoogleFirebaseIdToken } from './firebaseAdmin';
 
 export type LanguagePreference = 'auto' | 'english' | 'roman-urdu';
 
@@ -62,11 +63,73 @@ export async function registerUser(input: { name: string; email: string; passwor
 
 export async function loginUser(input: { email: string; password: string }, metadata?: { userAgent?: string; ipAddress?: string }) {
   const user = await UserModel.findOne({ email: input.email.trim().toLowerCase() }).select('+passwordHash');
-  const passwordValid = user ? await bcrypt.compare(input.password, user.passwordHash) : false;
+  const passwordValid = user?.passwordHash ? await bcrypt.compare(input.password, user.passwordHash) : false;
   if (!user || !passwordValid || !user.isActive) {
     throw new AppError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect.');
   }
 
+  const accessToken = issueAccessToken(user.id);
+  const refreshToken = issueRefreshToken(user.id);
+  await persistRefreshToken(user.id, refreshToken, metadata);
+  return { user: publicUser(user), accessToken, refreshToken };
+}
+
+/** Verify a Firebase-issued Google ID token, then issue Guftugo's own API session tokens. */
+export async function loginWithGoogleFirebase(
+  idToken: string,
+  preferredLanguage: LanguagePreference = 'auto',
+  metadata?: { userAgent?: string; ipAddress?: string },
+) {
+  const identity = await verifyGoogleFirebaseIdToken(idToken);
+  const normalizedEmail = identity.email.trim().toLowerCase();
+  let user = await UserModel.findOne({ firebaseUid: identity.uid });
+
+  if (user) {
+    if (user.email !== normalizedEmail) {
+      const emailOwner = await UserModel.exists({ email: normalizedEmail, _id: { $ne: user._id } });
+      if (emailOwner) {
+        throw new AppError(409, 'GOOGLE_EMAIL_IN_USE', 'This Google email is already associated with another account. Please sign in with that account.');
+      }
+      user.email = normalizedEmail;
+      await user.save();
+    }
+  } else {
+    // Firebase guarantees this email was verified by Google. It is therefore safe to
+    // attach the Google identity to an existing Guftugo account with the same email.
+    user = await UserModel.findOne({ email: normalizedEmail }).select('+firebaseUid');
+    if (user) {
+      if (user.firebaseUid && user.firebaseUid !== identity.uid) {
+        throw new AppError(409, 'GOOGLE_ACCOUNT_CONFLICT', 'This email is connected to a different Google account. Please use your original sign-in method.');
+      }
+      user.firebaseUid = identity.uid;
+      await user.save();
+    } else {
+      try {
+        const displayName = identity.name?.trim().slice(0, 80);
+        const emailName = normalizedEmail.split('@')[0].slice(0, 80);
+        const safeName = displayName && displayName.length >= 2
+          ? displayName
+          : emailName.length >= 2 ? emailName : 'Google User';
+        user = await UserModel.create({
+          name: safeName,
+          email: normalizedEmail,
+          firebaseUid: identity.uid,
+          preferredLanguage,
+        });
+      } catch (error) {
+        // A parallel first-time Google sign-in can race on the unique email/UID index.
+        const maybeMongoError = error as { code?: number };
+        if (maybeMongoError?.code !== 11000) throw error;
+        user = await UserModel.findOne({ $or: [{ firebaseUid: identity.uid }, { email: normalizedEmail }] }).select('+firebaseUid');
+        if (!user || (user.firebaseUid && user.firebaseUid !== identity.uid)) {
+          throw new AppError(409, 'GOOGLE_ACCOUNT_CONFLICT', 'An account with this Google email already exists. Please sign in with your existing account.');
+        }
+        if (!user.firebaseUid) { user.firebaseUid = identity.uid; await user.save(); }
+      }
+    }
+  }
+
+  if (!user.isActive) throw new AppError(403, 'ACCOUNT_UNAVAILABLE', 'This account is not available.');
   const accessToken = issueAccessToken(user.id);
   const refreshToken = issueRefreshToken(user.id);
   await persistRefreshToken(user.id, refreshToken, metadata);

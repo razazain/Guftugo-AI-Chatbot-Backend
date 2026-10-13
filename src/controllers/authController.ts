@@ -5,6 +5,7 @@ import { asyncHandler } from "../utils/asyncHandler";
 import { AppError } from "../utils/AppError";
 import {
   loginUser,
+  loginWithGoogleFirebase,
   publicUser,
   registerUser,
   revokeRefreshToken,
@@ -24,6 +25,10 @@ const loginSchema = z.object({
   password: z.string().min(1).max(128),
 });
 const refreshSchema = z.object({ refreshToken: z.string().min(20) });
+const googleSchema = z.object({
+  idToken: z.string().min(100).max(10000),
+  preferredLanguage: languageSchema.optional(),
+});
 const updateMeSchema = z
   .object({
     name: z.string().trim().min(2).max(80).optional(),
@@ -49,6 +54,16 @@ export const register: RequestHandler = asyncHandler(async (req, res) => {
 export const login: RequestHandler = asyncHandler(async (req, res) => {
   const body = loginSchema.parse(req.body);
   const result = await loginUser(body, requestMetadata(req));
+  res.json({ success: true, data: result });
+});
+
+export const googleSignIn: RequestHandler = asyncHandler(async (req, res) => {
+  const body = googleSchema.parse(req.body);
+  const result = await loginWithGoogleFirebase(
+    body.idToken,
+    body.preferredLanguage ?? 'auto',
+    requestMetadata(req),
+  );
   res.json({ success: true, data: result });
 });
 

@@ -6,7 +6,7 @@ A modular TypeScript/Node.js backend for Guftugo, a general-purpose AI assistant
 
 - Express + TypeScript API.
 - MongoDB Atlas persistence through Mongoose.
-- Registration, login, access tokens, refresh-token rotation, logout, current-user profile, language preference.
+- Registration, password login, Firebase Google sign-in, access tokens, refresh-token rotation, logout, current-user profile, language preference.
 - Chat history in separate `conversations` and `messages` collections.
 - Provider-neutral LLM adapter using the OpenAI-compatible chat completions interface.
 - Groq as primary by default; Gemini and OpenAI as optional providers.
@@ -27,7 +27,7 @@ A modular TypeScript/Node.js backend for Guftugo, a general-purpose AI assistant
 
 ## Requirements
 
-- Node.js 20.11 or newer.
+- Node.js 22 or newer.
 - MongoDB Atlas database and connection string.
 - At least one LLM provider API key. Groq is primary by default.
 
@@ -78,6 +78,10 @@ A modular TypeScript/Node.js backend for Guftugo, a general-purpose AI assistant
 - Add the server's IP to Atlas Network Access. For local development, add your current public IP; avoid `0.0.0.0/0` for production.
 - Use a database-specific connection string and URL-encode reserved characters in the password.
 - Keep the connection string only in `.env`; never send it to frontend code or commit it to Git.
+
+## Firebase Google sign-in
+
+The backend exposes `POST /api/v1/auth/google`. It verifies Firebase-issued Google ID tokens with Firebase Admin SDK, then creates/returns the regular Guftugo API session. To set up Google sign-in securely, follow [`FIREBASE_GOOGLE_SIGNIN_SETUP.md`](./FIREBASE_GOOGLE_SIGNIN_SETUP.md). The service-account private key belongs only in backend environment variables (Render), never in the frontend.
 
 ## LLM provider configuration
 

@@ -156,6 +156,39 @@
           ]
         },
         {
+          "name": "Google sign-in (Firebase)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"PASTE_FIREBASE_ID_TOKEN_HERE\",\n  \"preferredLanguage\": \"auto\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/google",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "google"
+              ]
+            },
+            "description": "Paste a Firebase ID token from a successful Google sign-in. The backend verifies it and returns Guftugo API tokens."
+          },
+          "response": []
+        },
+        {
           "name": "Refresh token",
           "request": {
             "method": "POST",
